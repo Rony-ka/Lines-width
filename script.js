@@ -3,18 +3,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     const gridContainer = document.getElementById('grid-container');
 
-    // --- NEW/UPDATED VALUES to match the updated CSS cell dimensions ---
     const actualGridRowHeight = 40; // Matches line height in CSS
     const actualGridColWidth = 20;  // Matches grid-template-columns in CSS
-    // --- END NEW/UPDATED VALUES ---
 
-    const growDuration = 500; // milliseconds for the line to become wider
-    const shrinkDelay = 1500;  // Delay before shrinking back
-    const initialScaleX = 1.2; // Match the initial scale in CSS
-    const targetScaleX = 10;   // How wide the line becomes on hover
+    const growDuration = 500;
+    const shrinkDelay = 1500;
+    const initialScaleX = 1.2;
+    const targetScaleX = 10;
 
     const lineStates = new Map();
     const lineTimeouts = new Map();
+    let previouslyTouchedLine = null;
 
     const clearAllLineAnimations = () => {
         lineStates.forEach(state => {
@@ -22,10 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 cancelAnimationFrame(state.animationFrameId);
             }
             state.isActive = false;
-            state.isGrowing = false; // Reset new state
-            state.shouldShrinkAfterGrowth = false; // Reset new state
+            state.isGrowing = false;
+            state.shouldShrinkAfterGrowth = false;
             state.animationFrameId = null;
-            // Ensure lines are reset if grid is cleared
             if (state.lineElement) {
                 state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
             }
@@ -33,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lineTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
         lineTimeouts.clear();
         lineStates.clear();
+        previouslyTouchedLine = null;
     };
 
     const populateGrid = () => {
@@ -55,169 +54,171 @@ document.addEventListener('DOMContentLoaded', () => {
             lineStates.set(line, {
                 lineElement: line,
                 currentScaleX: initialScaleX,
-                isActive: false, // Overall state (growing or shrinking)
-                isGrowing: false, // Specifically tracking if growth animation is in progress
-                shouldShrinkAfterGrowth: false, // Flag to indicate shrinking should follow growth
+                isActive: false,
+                isGrowing: false,
+                shouldShrinkAfterGrowth: false,
                 animationFrameId: null,
                 startTime: 0,
                 startScaleX: initialScaleX,
                 endScaleX: initialScaleX
             });
+        }
+    };
+    
+    // Helper function to get the element at a specific coordinate
+    const getTouchedLine = (x, y) => {
+        const element = document.elementFromPoint(x, y);
+        if (element && element.classList.contains('line')) {
+            return element;
+        }
+        return null;
+    };
 
-            line.addEventListener('mouseenter', () => {
-                const state = lineStates.get(line);
+    const startGrowAnimation = (line) => {
+        if (!line) return;
+        const state = lineStates.get(line);
+        if (!state) return;
 
-                // If currently shrinking, stop shrink and immediately start growth
-                if (!state.isGrowing && state.isActive) { // if active but not growing, it's shrinking
-                     if (state.animationFrameId) {
-                         cancelAnimationFrame(state.animationFrameId);
-                         state.animationFrameId = null;
-                     }
-                     state.isActive = false; // Reset overall state
-                }
+        // If currently shrinking, stop shrink and immediately start growth
+        if (!state.isGrowing && state.isActive) {
+            if (state.animationFrameId) {
+                cancelAnimationFrame(state.animationFrameId);
+                state.animationFrameId = null;
+            }
+            state.isActive = false;
+        }
 
-                if (lineTimeouts.has(line)) {
-                    clearTimeout(lineTimeouts.get(line));
-                    lineTimeouts.delete(line);
-                }
+        if (lineTimeouts.has(line)) {
+            clearTimeout(lineTimeouts.get(line));
+            lineTimeouts.delete(line);
+        }
 
-                if (!state.isActive) { // Only start new animation if not already active (growing or shrinking)
-                    state.isActive = true;
-                    state.isGrowing = true; // Set growing flag
-                    state.shouldShrinkAfterGrowth = false; // Clear flag for subsequent shrink
-                    state.startTime = performance.now();
-                    state.startScaleX = state.currentScaleX; // Start from current scale
-                    state.endScaleX = targetScaleX;
+        if (!state.isActive) {
+            state.isActive = true;
+            state.isGrowing = true;
+            state.shouldShrinkAfterGrowth = false;
+            state.startTime = performance.now();
+            state.startScaleX = state.currentScaleX;
+            state.endScaleX = targetScaleX;
 
-
-                    const animateGrowth = (currentTime) => {
-                        // Check if animation was stopped (e.g., by populateGrid or another mouseenter/leave)
-                        if (!state.isActive || !state.isGrowing) {
-                            state.animationFrameId = null;
-                            return;
-                        }
-
-                        const elapsed = currentTime - state.startTime;
-                        let progress = Math.min(elapsed / growDuration, 1);
-                        // --- REVERTED: Using the original easeOutQuad (which is easeInOutQuad) ---
-                        progress = easeOutQuad(progress);
-
-                        state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
-
-                        state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
-
-                        if (progress < 1) {
-                            state.animationFrameId = requestAnimationFrame(animateGrowth);
-                        } else {
-                            // Growth animation complete
-                            state.animationFrameId = null;
-                            state.isGrowing = false; // Growth is finished
-
-                            // If mouse left during growth, start shrink now
-                            if (state.shouldShrinkAfterGrowth) {
-                                // Reset shouldShrinkAfterGrowth before starting new shrink animation
-                                state.shouldShrinkAfterGrowth = false;
-                                // Directly call animateShrink setup logic
-                                state.startTime = performance.now();
-                                state.startScaleX = state.currentScaleX;
-                                state.endScaleX = initialScaleX;
-                                const animateShrinkNow = (time) => {
-                                    const elapsed = time - state.startTime;
-                                    let progress = Math.min(elapsed / shrinkDelay, 1);
-                                    // --- REVERTED: Using the original easeOutQuad ---
-                                    progress = easeOutQuad(progress);
-
-                                    state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
-                                    state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
-
-                                    if (progress < 1) {
-                                        state.animationFrameId = requestAnimationFrame(animateShrinkNow);
-                                    } else {
-                                        state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
-                                        state.isActive = false; // Animation fully complete
-                                        lineTimeouts.delete(line);
-                                    }
-                                };
-                                state.animationFrameId = requestAnimationFrame(animateShrinkNow);
-
-                            } else {
-                                // If mouse is still over, keep line wide
-                                state.isActive = true; // Still active (fully grown)
-                            }
-                        }
-                    };
-                    state.animationFrameId = requestAnimationFrame(animateGrowth);
-                }
-            });
-
-            line.addEventListener('mouseleave', () => {
-                const state = lineStates.get(line);
-
-                if (state.isGrowing) {
-                    // Mouse left during growth, set flag to shrink when growth completes
-                    state.shouldShrinkAfterGrowth = true;
-                    // Do NOT stop the current growth animation here
+            const animateGrowth = (currentTime) => {
+                if (!state.isActive || !state.isGrowing) {
+                    state.animationFrameId = null;
                     return;
                 }
 
-                // If not currently growing, proceed with shrink animation
-                if (state.isActive) {
-                    // Cancel any pending shrink timeout if mouse re-entered and left quickly
-                    if (lineTimeouts.has(line)) {
-                        clearTimeout(lineTimeouts.get(line));
-                        lineTimeouts.delete(line);
+                const elapsed = currentTime - state.startTime;
+                let progress = Math.min(elapsed / growDuration, 1);
+                progress = easeOutQuad(progress);
+
+                state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
+                state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
+
+                if (progress < 1) {
+                    state.animationFrameId = requestAnimationFrame(animateGrowth);
+                } else {
+                    state.animationFrameId = null;
+                    state.isGrowing = false;
+                    if (state.shouldShrinkAfterGrowth) {
+                        state.shouldShrinkAfterGrowth = false;
+                        startShrinkAnimation(line, 0); // Start shrink immediately
+                    } else {
+                        state.isActive = true;
                     }
-
-                    // This setTimeout initiates the shrink after a delay if it's not already growing
-                    const timeoutId = setTimeout(() => {
-                        state.isActive = false; // Now ready to shrink
-                        if (state.animationFrameId) {
-                            cancelAnimationFrame(state.animationFrameId); // Cancel any previous animation frame
-                            state.animationFrameId = null;
-                        }
-
-                        // Store current state to animate back from
-                        state.startScaleX = state.currentScaleX;
-                        state.endScaleX = initialScaleX;
-                        state.startTime = performance.now();
-
-
-                        const animateShrink = (currentTime) => {
-                            // Check if animation was stopped
-                            if (state.isActive) { // If isActive is true, it means mouse re-entered during shrink
-                                state.animationFrameId = null;
-                                return;
-                            }
-
-                            const elapsed = currentTime - state.startTime;
-                            let progress = Math.min(elapsed / shrinkDelay, 1);
-                            // --- REVERTED: Using the original easeOutQuad ---
-                            progress = easeOutQuad(progress);
-
-                            state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
-
-                            state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
-
-
-                            if (progress < 1) {
-                                state.animationFrameId = requestAnimationFrame(animateShrink);
-                            } else {
-                                // Ensure it snaps to perfect initial width at the end
-                                state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
-                                state.isActive = false; // Animation fully complete
-                                lineTimeouts.delete(line);
-                            }
-                        };
-                        state.animationFrameId = requestAnimationFrame(animateShrink);
-                    }, 0); // Start shrink animation immediately after mouseleave
-
-                    lineTimeouts.set(line, timeoutId);
                 }
-            });
+            };
+            state.animationFrameId = requestAnimationFrame(animateGrowth);
         }
     };
 
-    // --- REVERTED: Original easeOutQuad function body (which is easeInOutQuad) ---
+    const startShrinkAnimation = (line, delay) => {
+        if (!line) return;
+        const state = lineStates.get(line);
+        if (!state) return;
+
+        if (state.isGrowing) {
+            state.shouldShrinkAfterGrowth = true;
+            return;
+        }
+
+        if (state.isActive) {
+            if (lineTimeouts.has(line)) {
+                clearTimeout(lineTimeouts.get(line));
+                lineTimeouts.delete(line);
+            }
+
+            const timeoutId = setTimeout(() => {
+                state.isActive = false;
+                if (state.animationFrameId) {
+                    cancelAnimationFrame(state.animationFrameId);
+                    state.animationFrameId = null;
+                }
+
+                state.startScaleX = state.currentScaleX;
+                state.endScaleX = initialScaleX;
+                state.startTime = performance.now();
+
+                const animateShrink = (currentTime) => {
+                    if (state.isActive) {
+                        state.animationFrameId = null;
+                        return;
+                    }
+
+                    const elapsed = currentTime - state.startTime;
+                    let progress = Math.min(elapsed / shrinkDelay, 1);
+                    progress = easeOutQuad(progress);
+
+                    state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
+                    state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
+
+                    if (progress < 1) {
+                        state.animationFrameId = requestAnimationFrame(animateShrink);
+                    } else {
+                        state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
+                        state.isActive = false;
+                        lineTimeouts.delete(line);
+                    }
+                };
+                state.animationFrameId = requestAnimationFrame(animateShrink);
+            }, delay);
+
+            lineTimeouts.set(line, timeoutId);
+        }
+    };
+
+    gridContainer.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const currentLine = getTouchedLine(touch.clientX, touch.clientY);
+        if (currentLine) {
+            startGrowAnimation(currentLine);
+            previouslyTouchedLine = currentLine;
+        }
+    });
+
+    gridContainer.addEventListener('touchmove', (e) => {
+        e.preventDefault(); // Prevent scrolling
+        const touch = e.touches[0];
+        const currentLine = getTouchedLine(touch.clientX, touch.clientY);
+
+        if (currentLine && currentLine !== previouslyTouchedLine) {
+            // Shrink the old line
+            if (previouslyTouchedLine) {
+                startShrinkAnimation(previouslyTouchedLine, 0); // Shrink immediately
+            }
+            // Grow the new line
+            startGrowAnimation(currentLine);
+            previouslyTouchedLine = currentLine;
+        }
+    });
+
+    gridContainer.addEventListener('touchend', () => {
+        if (previouslyTouchedLine) {
+            startShrinkAnimation(previouslyTouchedLine, shrinkDelay);
+            previouslyTouchedLine = null;
+        }
+    });
+
+    // --- Original easeOutQuad function body (which is easeInOutQuad) ---
     function easeOutQuad(t) {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     }
