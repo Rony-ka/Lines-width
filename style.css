@@ -1,0 +1,55 @@
+/* style.css */
+
+/* ... other styles ... */
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #ffffff; /* White background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20px, 1fr));
+    /* ENSURE THIS HEIGHT MATCHES THE HEIGHT OF .line::before */
+    grid-template-rows: repeat(auto-fill, minmax(45px, 1fr));
+
+    width: 100vw;
+    height: 100vh; /* Make sure grid container fully fills viewport */
+    box-sizing: border-box;
+    padding: 0px;
+margin-top: -10px;
+    overflow: hidden;
+}
+
+.line {
+    width: 100%;
+    height: 100%; /* Make sure .line div fills its grid cell */
+    transform-origin: center center;
+    transition: transform 0.5s ease-out;
+
+    --line-width-scale: 1.2;
+    transform: scaleX(var(--line-width-scale));
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    &::before {
+        content: '';
+        background-color: #000000;
+        width: 1px;
+        /* ENSURE THIS HEIGHT MATCHES grid-template-rows minmax value */
+        height: 45px; /* <--- MAKE SURE THIS IS 45px */
+    }
+}
