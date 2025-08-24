@@ -36,23 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
-        // --- NEW/UPDATED LOGIC: Extract numerical values from computed styles ---
-        const computedStyle = window.getComputedStyle(gridContainer);
+        let actualGridRowHeight, actualGridColWidth;
 
-        // Function to extract the pixel value from a grid-template string
-        const getGridPixelValue = (styleString) => {
-            const match = styleString.match(/minmax\((\d+)px/);
-            return match ? parseInt(match[1], 10) : 0;
-        };
-        
-        const actualGridRowHeight = getGridPixelValue(computedStyle.gridTemplateRows);
-        const actualGridColWidth = getGridPixelValue(computedStyle.gridTemplateColumns);
-
-        if (actualGridRowHeight === 0 || actualGridColWidth === 0) {
-            console.error("Could not determine grid dimensions from CSS. Please ensure 'minmax' is used with a pixel value.");
-            return;
+        if (viewportWidth <= 600) {
+            actualGridRowHeight = 60;
+            actualGridColWidth = viewportWidth;
+        } else {
+            actualGridRowHeight = 45;
+            actualGridColWidth = 20;
         }
-        // --- END NEW/UPDATED LOGIC ---
 
         const rowsThatFit = Math.floor(viewportHeight / actualGridRowHeight);
         const colsThatFit = Math.floor(viewportWidth / actualGridColWidth);
@@ -76,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 endScaleX: initialScaleX
             });
 
-            line.addEventListener('mouseenter', () => {
+            const handlePointerOver = () => {
                 const state = lineStates.get(line);
 
                 if (!state.isGrowing && state.isActive) {
@@ -148,9 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
                     state.animationFrameId = requestAnimationFrame(animateGrowth);
                 }
-            });
+            };
 
-            line.addEventListener('mouseleave', () => {
+            const handlePointerOut = () => {
                 const state = lineStates.get(line);
 
                 if (state.isGrowing) {
@@ -202,6 +194,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     lineTimeouts.set(line, timeoutId);
                 }
+            };
+            
+            line.addEventListener('mouseenter', handlePointerOver);
+            line.addEventListener('mouseleave', handlePointerOut);
+            
+            // Add touch event listeners for mobile devices
+            line.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Prevents default touch behavior like scrolling
+                handlePointerOver();
+            });
+            line.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handlePointerOut();
             });
         }
     };
