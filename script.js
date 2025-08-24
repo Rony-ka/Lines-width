@@ -38,9 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let actualGridRowHeight, actualGridColWidth;
 
+        // Use a more reliable method to determine dimensions based on screen width.
+        // This avoids issues with getComputedStyle on complex grid values.
         if (viewportWidth <= 600) {
             actualGridRowHeight = 60;
-            actualGridColWidth = viewportWidth;
+            actualGridColWidth = viewportWidth; // In single column mode, width is 100%
         } else {
             actualGridRowHeight = 45;
             actualGridColWidth = 20;
@@ -68,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 endScaleX: initialScaleX
             });
 
+            // --- NEW: Use a single handler for both pointerover (hover) and touch ---
             const handlePointerOver = () => {
                 const state = lineStates.get(line);
 
@@ -142,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
+            // --- NEW: Use a single handler for pointerout (hover off) and touchend ---
             const handlePointerOut = () => {
                 const state = lineStates.get(line);
 
@@ -196,18 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
             
-            line.addEventListener('mouseenter', handlePointerOver);
-            line.addEventListener('mouseleave', handlePointerOut);
-            
-            // Add touch event listeners for mobile devices
-            line.addEventListener('touchstart', (e) => {
-                e.preventDefault(); // Prevents default touch behavior like scrolling
-                handlePointerOver();
-            });
-            line.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                handlePointerOut();
-            });
+            line.addEventListener('pointerover', handlePointerOver);
+            line.addEventListener('pointerout', handlePointerOut);
         }
     };
 
