@@ -3,11 +3,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const gridContainer = document.getElementById('grid-container');
 
-    // --- NEW/UPDATED VALUES to match the updated CSS cell dimensions ---
-    let actualGridRowHeight;
-    let actualGridColWidth;
-    // --- END NEW/UPDATED VALUES ---
-
     const growDuration = 500; // milliseconds for the line to become wider
     const shrinkDelay = 1500;  // Delay before shrinking back
     const initialScaleX = 1.2; // Match the initial scale in CSS
@@ -40,17 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
-
-        // --- NEW/UPDATED LOGIC: Check for mobile or desktop and set dimensions ---
-        if (viewportWidth <= 600) {
-            // Mobile dimensions as defined in CSS media query
-            actualGridRowHeight = 60;
-            actualGridColWidth = viewportWidth; // One column takes up full width
-        } else {
-            // Desktop dimensions
-            actualGridRowHeight = 45;
-            actualGridColWidth = 20;
-        }
+        
+        // --- NEW/UPDATED LOGIC: Get dimensions from computed styles ---
+        const computedStyle = window.getComputedStyle(gridContainer);
+        const actualGridRowHeight = parseInt(computedStyle.gridTemplateRows.split(' ')[0], 10);
+        const actualGridColWidth = parseInt(computedStyle.gridTemplateColumns.split(' ')[0], 10);
         // --- END NEW/UPDATED LOGIC ---
 
         const rowsThatFit = Math.floor(viewportHeight / actualGridRowHeight);
