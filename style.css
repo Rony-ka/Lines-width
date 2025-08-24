@@ -20,6 +20,7 @@ body {
 
 #grid-container {
     display: grid;
+    /* Desktop layout: Flexible grid with 20px min width columns */
     grid-template-columns: repeat(auto-fill, minmax(20px, 1fr));
     /* ENSURE THIS HEIGHT MATCHES THE HEIGHT OF .line::before */
     grid-template-rows: repeat(auto-fill, minmax(45px, 1fr));
@@ -28,7 +29,7 @@ body {
     height: 100vh; /* Make sure grid container fully fills viewport */
     box-sizing: border-box;
     padding: 0px;
-margin-top: -10px;
+    margin-top: -10px;
     overflow: hidden;
 }
 
@@ -51,5 +52,20 @@ margin-top: -10px;
         width: 1px;
         /* ENSURE THIS HEIGHT MATCHES grid-template-rows minmax value */
         height: 45px; /* <--- MAKE SURE THIS IS 45px */
+    }
+}
+
+/* --- Mobile-first approach: Adjust for smaller screens --- */
+@media (max-width: 600px) {
+    #grid-container {
+        /* Mobile layout: A single column with a fraction unit to fill the width */
+        grid-template-columns: 1fr;
+        /* The lines are taller on mobile */
+        grid-template-rows: repeat(auto-fill, minmax(60px, 1fr));
+    }
+
+    .line::before {
+        /* Make the lines taller to match the new grid row height */
+        height: 60px;
     }
 }
