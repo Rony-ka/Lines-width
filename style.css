@@ -45,14 +45,13 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+}
 
-    &::before {
-        content: '';
-        background-color: #000000;
-        width: 1px;
-        /* ENSURE THIS HEIGHT MATCHES grid-template-rows minmax value */
-        height: 45px; /* <--- MAKE SURE THIS IS 45px */
-    }
+.line::before {
+    content: '';
+    background-color: #000000;
+    width: 1px;
+    height: 45px;
 }
 
 /* --- Mobile-first approach: Adjust for smaller screens --- */
