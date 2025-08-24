@@ -3,17 +3,18 @@
 document.addEventListener('DOMContentLoaded', () => {
     const gridContainer = document.getElementById('grid-container');
 
-    const actualGridRowHeight = 40; // Matches line height in CSS
-    const actualGridColWidth = 20;  // Matches grid-template-columns in CSS
+    // --- NEW/UPDATED VALUES to match the updated CSS cell dimensions ---
+    let actualGridRowHeight;
+    let actualGridColWidth;
+    // --- END NEW/UPDATED VALUES ---
 
-    const growDuration = 500;
-    const shrinkDelay = 1500;
-    const initialScaleX = 1.2;
-    const targetScaleX = 10;
+    const growDuration = 500; // milliseconds for the line to become wider
+    const shrinkDelay = 1500;  // Delay before shrinking back
+    const initialScaleX = 1.2; // Match the initial scale in CSS
+    const targetScaleX = 10;   // How wide the line becomes on hover
 
     const lineStates = new Map();
     const lineTimeouts = new Map();
-    let previouslyTouchedLine = null;
 
     const clearAllLineAnimations = () => {
         lineStates.forEach(state => {
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
         lineTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
         lineTimeouts.clear();
         lineStates.clear();
-        previouslyTouchedLine = null;
     };
 
     const populateGrid = () => {
@@ -40,6 +40,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
+
+        // --- NEW/UPDATED LOGIC: Check for mobile or desktop and set dimensions ---
+        if (viewportWidth <= 600) {
+            // Mobile dimensions as defined in CSS media query
+            actualGridRowHeight = 60;
+            actualGridColWidth = viewportWidth; // One column takes up full width
+        } else {
+            // Desktop dimensions
+            actualGridRowHeight = 45;
+            actualGridColWidth = 20;
+        }
+        // --- END NEW/UPDATED LOGIC ---
 
         const rowsThatFit = Math.floor(viewportHeight / actualGridRowHeight);
         const colsThatFit = Math.floor(viewportWidth / actualGridColWidth);
@@ -62,163 +74,137 @@ document.addEventListener('DOMContentLoaded', () => {
                 startScaleX: initialScaleX,
                 endScaleX: initialScaleX
             });
-        }
-    };
-    
-    // Helper function to get the element at a specific coordinate
-    const getTouchedLine = (x, y) => {
-        const element = document.elementFromPoint(x, y);
-        if (element && element.classList.contains('line')) {
-            return element;
-        }
-        return null;
-    };
 
-    const startGrowAnimation = (line) => {
-        if (!line) return;
-        const state = lineStates.get(line);
-        if (!state) return;
+            line.addEventListener('mouseenter', () => {
+                const state = lineStates.get(line);
 
-        // If currently shrinking, stop shrink and immediately start growth
-        if (!state.isGrowing && state.isActive) {
-            if (state.animationFrameId) {
-                cancelAnimationFrame(state.animationFrameId);
-                state.animationFrameId = null;
-            }
-            state.isActive = false;
-        }
+                if (!state.isGrowing && state.isActive) {
+                     if (state.animationFrameId) {
+                         cancelAnimationFrame(state.animationFrameId);
+                         state.animationFrameId = null;
+                     }
+                     state.isActive = false;
+                }
 
-        if (lineTimeouts.has(line)) {
-            clearTimeout(lineTimeouts.get(line));
-            lineTimeouts.delete(line);
-        }
+                if (lineTimeouts.has(line)) {
+                    clearTimeout(lineTimeouts.get(line));
+                    lineTimeouts.delete(line);
+                }
 
-        if (!state.isActive) {
-            state.isActive = true;
-            state.isGrowing = true;
-            state.shouldShrinkAfterGrowth = false;
-            state.startTime = performance.now();
-            state.startScaleX = state.currentScaleX;
-            state.endScaleX = targetScaleX;
+                if (!state.isActive) {
+                    state.isActive = true;
+                    state.isGrowing = true;
+                    state.shouldShrinkAfterGrowth = false;
+                    state.startTime = performance.now();
+                    state.startScaleX = state.currentScaleX;
+                    state.endScaleX = targetScaleX;
 
-            const animateGrowth = (currentTime) => {
-                if (!state.isActive || !state.isGrowing) {
-                    state.animationFrameId = null;
+                    const animateGrowth = (currentTime) => {
+                        if (!state.isActive || !state.isGrowing) {
+                            state.animationFrameId = null;
+                            return;
+                        }
+
+                        const elapsed = currentTime - state.startTime;
+                        let progress = Math.min(elapsed / growDuration, 1);
+                        progress = easeOutQuad(progress);
+
+                        state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
+
+                        state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
+
+                        if (progress < 1) {
+                            state.animationFrameId = requestAnimationFrame(animateGrowth);
+                        } else {
+                            state.animationFrameId = null;
+                            state.isGrowing = false;
+                            if (state.shouldShrinkAfterGrowth) {
+                                state.shouldShrinkAfterGrowth = false;
+                                state.startTime = performance.now();
+                                state.startScaleX = state.currentScaleX;
+                                state.endScaleX = initialScaleX;
+                                const animateShrinkNow = (time) => {
+                                    const elapsed = time - state.startTime;
+                                    let progress = Math.min(elapsed / shrinkDelay, 1);
+                                    progress = easeOutQuad(progress);
+
+                                    state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
+                                    state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
+
+                                    if (progress < 1) {
+                                        state.animationFrameId = requestAnimationFrame(animateShrinkNow);
+                                    } else {
+                                        state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
+                                        state.isActive = false;
+                                        lineTimeouts.delete(line);
+                                    }
+                                };
+                                state.animationFrameId = requestAnimationFrame(animateShrinkNow);
+                            } else {
+                                state.isActive = true;
+                            }
+                        }
+                    };
+                    state.animationFrameId = requestAnimationFrame(animateGrowth);
+                }
+            });
+
+            line.addEventListener('mouseleave', () => {
+                const state = lineStates.get(line);
+
+                if (state.isGrowing) {
+                    state.shouldShrinkAfterGrowth = true;
                     return;
                 }
 
-                const elapsed = currentTime - state.startTime;
-                let progress = Math.min(elapsed / growDuration, 1);
-                progress = easeOutQuad(progress);
-
-                state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
-                state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
-
-                if (progress < 1) {
-                    state.animationFrameId = requestAnimationFrame(animateGrowth);
-                } else {
-                    state.animationFrameId = null;
-                    state.isGrowing = false;
-                    if (state.shouldShrinkAfterGrowth) {
-                        state.shouldShrinkAfterGrowth = false;
-                        startShrinkAnimation(line, 0); // Start shrink immediately
-                    } else {
-                        state.isActive = true;
-                    }
-                }
-            };
-            state.animationFrameId = requestAnimationFrame(animateGrowth);
-        }
-    };
-
-    const startShrinkAnimation = (line, delay) => {
-        if (!line) return;
-        const state = lineStates.get(line);
-        if (!state) return;
-
-        if (state.isGrowing) {
-            state.shouldShrinkAfterGrowth = true;
-            return;
-        }
-
-        if (state.isActive) {
-            if (lineTimeouts.has(line)) {
-                clearTimeout(lineTimeouts.get(line));
-                lineTimeouts.delete(line);
-            }
-
-            const timeoutId = setTimeout(() => {
-                state.isActive = false;
-                if (state.animationFrameId) {
-                    cancelAnimationFrame(state.animationFrameId);
-                    state.animationFrameId = null;
-                }
-
-                state.startScaleX = state.currentScaleX;
-                state.endScaleX = initialScaleX;
-                state.startTime = performance.now();
-
-                const animateShrink = (currentTime) => {
-                    if (state.isActive) {
-                        state.animationFrameId = null;
-                        return;
-                    }
-
-                    const elapsed = currentTime - state.startTime;
-                    let progress = Math.min(elapsed / shrinkDelay, 1);
-                    progress = easeOutQuad(progress);
-
-                    state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
-                    state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
-
-                    if (progress < 1) {
-                        state.animationFrameId = requestAnimationFrame(animateShrink);
-                    } else {
-                        state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
-                        state.isActive = false;
+                if (state.isActive) {
+                    if (lineTimeouts.has(line)) {
+                        clearTimeout(lineTimeouts.get(line));
                         lineTimeouts.delete(line);
                     }
-                };
-                state.animationFrameId = requestAnimationFrame(animateShrink);
-            }, delay);
 
-            lineTimeouts.set(line, timeoutId);
+                    const timeoutId = setTimeout(() => {
+                        state.isActive = false;
+                        if (state.animationFrameId) {
+                            cancelAnimationFrame(state.animationFrameId);
+                            state.animationFrameId = null;
+                        }
+
+                        state.startScaleX = state.currentScaleX;
+                        state.endScaleX = initialScaleX;
+                        state.startTime = performance.now();
+
+                        const animateShrink = (currentTime) => {
+                            if (state.isActive) {
+                                state.animationFrameId = null;
+                                return;
+                            }
+
+                            const elapsed = currentTime - state.startTime;
+                            let progress = Math.min(elapsed / shrinkDelay, 1);
+                            progress = easeOutQuad(progress);
+
+                            state.currentScaleX = state.startScaleX + (state.endScaleX - state.startScaleX) * progress;
+
+                            state.lineElement.style.setProperty('--line-width-scale', `${state.currentScaleX}`);
+
+                            if (progress < 1) {
+                                state.animationFrameId = requestAnimationFrame(animateShrink);
+                            } else {
+                                state.lineElement.style.setProperty('--line-width-scale', `${initialScaleX}`);
+                                state.isActive = false;
+                                lineTimeouts.delete(line);
+                            }
+                        };
+                        state.animationFrameId = requestAnimationFrame(animateShrink);
+                    }, 0);
+
+                    lineTimeouts.set(line, timeoutId);
+                }
+            });
         }
     };
 
-    gridContainer.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        const currentLine = getTouchedLine(touch.clientX, touch.clientY);
-        if (currentLine) {
-            startGrowAnimation(currentLine);
-            previouslyTouchedLine = currentLine;
-        }
-    });
-
-    gridContainer.addEventListener('touchmove', (e) => {
-        e.preventDefault(); // Prevent scrolling
-        const touch = e.touches[0];
-        const currentLine = getTouchedLine(touch.clientX, touch.clientY);
-
-        if (currentLine && currentLine !== previouslyTouchedLine) {
-            // Shrink the old line
-            if (previouslyTouchedLine) {
-                startShrinkAnimation(previouslyTouchedLine, 0); // Shrink immediately
-            }
-            // Grow the new line
-            startGrowAnimation(currentLine);
-            previouslyTouchedLine = currentLine;
-        }
-    });
-
-    gridContainer.addEventListener('touchend', () => {
-        if (previouslyTouchedLine) {
-            startShrinkAnimation(previouslyTouchedLine, shrinkDelay);
-            previouslyTouchedLine = null;
-        }
-    });
-
-    // --- Original easeOutQuad function body (which is easeInOutQuad) ---
     function easeOutQuad(t) {
         return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     }
