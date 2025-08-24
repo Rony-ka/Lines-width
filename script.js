@@ -36,10 +36,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
-        // --- NEW/UPDATED LOGIC: Get dimensions from computed styles ---
+        // --- NEW/UPDATED LOGIC: Extract numerical values from computed styles ---
         const computedStyle = window.getComputedStyle(gridContainer);
-        const actualGridRowHeight = parseInt(computedStyle.gridTemplateRows.split(' ')[0], 10);
-        const actualGridColWidth = parseInt(computedStyle.gridTemplateColumns.split(' ')[0], 10);
+
+        // Function to extract the pixel value from a grid-template string
+        const getGridPixelValue = (styleString) => {
+            const match = styleString.match(/minmax\((\d+)px/);
+            return match ? parseInt(match[1], 10) : 0;
+        };
+        
+        const actualGridRowHeight = getGridPixelValue(computedStyle.gridTemplateRows);
+        const actualGridColWidth = getGridPixelValue(computedStyle.gridTemplateColumns);
+
+        if (actualGridRowHeight === 0 || actualGridColWidth === 0) {
+            console.error("Could not determine grid dimensions from CSS. Please ensure 'minmax' is used with a pixel value.");
+            return;
+        }
         // --- END NEW/UPDATED LOGIC ---
 
         const rowsThatFit = Math.floor(viewportHeight / actualGridRowHeight);
